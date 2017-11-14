@@ -3,28 +3,88 @@ package main
 import (
 	"bytes"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 var logger *log.Logger
 
+var (
+	// 变量初始化
+	blogGit     = os.Getenv("BLOG_GIT")
+	publishGit  = os.Getenv("PUBLISH_GIT")
+	themeGit    = os.Getenv("THEME_GIT")
+	certificate = os.Getenv("CERTIFICATE")
+	baseURL     = os.Getenv("BASE_URL")
+	title       = os.Getenv("TITLE")
+	theme       = os.Getenv("THEME")
+)
+
+const (
+	// BlogPath 博客所在路径
+	BlogPath = "/opt/goblog/"
+)
+
 func main() {
 
-	logfile, err := os.OpenFile("/home/macd/blogci/bin/blogci.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-
+	logfile, err := os.OpenFile("/opt/blogci/bin/blogci.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("%s\n", err.Error())
 	}
-
 	defer logfile.Close()
-
 	logger = log.New(logfile, "", log.Ldate|log.Ltime|log.Llongfile)
 
+	// 修改config内容
+	bytes, err := ioutil.ReadFile(BlogPath + "config.yaml")
+	if err != nil {
+		log.Fatal("Open config file error:", err)
+	}
+	// 暂时做简单地替换
+	config := string(bytes)
+	config = strings.Replace(config, "||baseurl||", baseURL, -1)
+	config = strings.Replace(config, "||title||", title, -1)
+	config = strings.Replace(config, "||theme||", theme, -1)
+	err = ioutil.WriteFile(BlogPath+"config.yaml", []byte(config), os.ModePerm)
+
+	// 下载主题
+	// 切换至主题文件夹
+	os.Chdir(BlogPath + "themes")
+	cmd := exec.Command("git", "clone", themeGit)
+	b, err := cmd.Output()
+	if err != nil {
+		logger.Println("clone theme error: ", err)
+		return
+	}
+	logger.Println(string(b))
+
+	// 下载md文件
+	os.Chdir(BlogPath + "content")
+	cmd = exec.Command("git", "clone", blogGit, "./")
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("clone md error: ", err)
+		return
+	}
+	logger.Println(string(b))
+
+	// 下载静态页面
+	os.Chdir(BlogPath + "publish")
+	cmd = exec.Command("git", "clone", publishGit, "./")
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("clone md error: ", err)
+		return
+	}
+	logger.Println(string(b))
+
+	// 修改gitconfig增加git认证
+
 	http.HandleFunc("/githooks", gitHooks)
-	err = http.ListenAndServe(":8888", nil)
+	err = http.ListenAndServe(":8080", nil)
 
 	if err != nil {
 		log.Fatal("ListenAndServer: ", err)
@@ -40,7 +100,7 @@ func gitHooks(w http.ResponseWriter, r *http.Request) {
 	// 接下来需要做的事情：
 	// 1. 更新blog本地仓库
 	cmd := exec.Command("git", "pull", "origin", "master")
-	os.Chdir("/home/macd/goblog/content")
+	os.Chdir(BlogPath + "content")
 	b, err := cmd.Output()
 	if err != nil {
 		logger.Println("execute cmd [git pull origin master] error: ", err)
@@ -50,7 +110,7 @@ func gitHooks(w http.ResponseWriter, r *http.Request) {
 	logger.Println(string(b))
 
 	// 2. 调用hugo命令生成静态页面
-	os.Chdir("/home/macd/goblog")
+	os.Chdir(BlogPath)
 	cmd = exec.Command("hugo")
 	b, err = cmd.Output()
 	if err != nil {
@@ -62,7 +122,7 @@ func gitHooks(w http.ResponseWriter, r *http.Request) {
 
 	// 3. push静态页面至github
 	// 3.1 添加文件
-	os.Chdir("/home/macd/goblog/public")
+	os.Chdir(BlogPath + "public")
 	//cmd = exec.Command("git", "add", ".")
 	cmd = exec.Command("/bin/sh", "-c", "git add .")
 	b, err = cmd.Output()
@@ -74,7 +134,7 @@ func gitHooks(w http.ResponseWriter, r *http.Request) {
 	logger.Println(string(b))
 
 	// 3.2 本地提交
-	os.Chdir("/home/macd/goblog/public")
+	os.Chdir(BlogPath + "public")
 	//cmd = exec.Command("git", "commit", "-m", "\"blogci automatic commit\"")
 	cmd = exec.Command("/bin/sh", "-c", "git commit -m \"blogci automatic commit\"")
 	var stdout bytes.Buffer
@@ -90,7 +150,7 @@ func gitHooks(w http.ResponseWriter, r *http.Request) {
 	logger.Println(string(stdout.Bytes()))
 
 	// 3.3 推送github
-	os.Chdir("/home/macd/goblog/public")
+	os.Chdir(BlogPath + "public")
 	cmd = exec.Command("/bin/sh", "-c", "git push origin master")
 	b, err = cmd.Output()
 	if err != nil {
