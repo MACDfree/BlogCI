@@ -15,18 +15,24 @@ var logger *log.Logger
 
 var (
 	// 变量初始化
-	blogGit     = os.Getenv("BLOG_GIT")
-	publishGit  = os.Getenv("PUBLISH_GIT")
-	themeGit    = os.Getenv("THEME_GIT")
-	certificate = os.Getenv("CERTIFICATE")
-	baseURL     = os.Getenv("BASE_URL")
-	title       = os.Getenv("TITLE")
-	theme       = os.Getenv("THEME")
+	blogGit    = os.Getenv("BLOG_GIT")
+	publishGit = os.Getenv("PUBLISH_GIT")
+	themeGit   = os.Getenv("THEME_GIT")
+	//certificate = os.Getenv("CERTIFICATE")
+	userName = os.Getenv("USER_NAME")
+	password = os.Getenv("PASSWORD")
+	host     = os.Getenv("HOST")
+	email    = os.Getenv("EMAIL")
+	baseURL  = os.Getenv("BASE_URL")
+	title    = os.Getenv("TITLE")
+	theme    = os.Getenv("THEME")
 )
 
 const (
 	// BlogPath 博客所在路径
 	BlogPath = "/opt/goblog/"
+	// CredentialPath 凭证存储路径
+	CredentialPath = "/opt/.my-key"
 )
 
 func main() {
@@ -81,7 +87,43 @@ func main() {
 	}
 	logger.Println(string(b))
 
-	// 修改gitconfig增加git认证
+	// 设置username
+	cmd = exec.Command("git", "config", "user.name", userName)
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("git config username error: ", err)
+		return
+	}
+	logger.Println(string(b))
+
+	// 设置email
+	cmd = exec.Command("git", "config", "user.email", email)
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("git config email error: ", err)
+		return
+	}
+	logger.Println(string(b))
+
+	// 修改publish仓库的gitconfig增加git认证
+	// 进入publish目录
+	os.Chdir(BlogPath + "publish")
+	// 执行git配置凭据命令
+	cmd = exec.Command("git", "config", "credential.helper", "store", "--file", CredentialPath)
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("config error: ", err)
+		return
+	}
+	logger.Println(string(b))
+	// 填充用户名密码
+	cmd = exec.Command("/bin/sh", "-c", "echo -e 'protocol=https\nhost="+host+"\nusername="+userName+"\npassword="+password+"\n\n' | git credential-store --file "+CredentialPath+" store")
+	b, err = cmd.Output()
+	if err != nil {
+		logger.Println("credential-store error: ", err)
+		return
+	}
+	logger.Println(string(b))
 
 	http.HandleFunc("/githooks", gitHooks)
 	err = http.ListenAndServe(":8080", nil)
