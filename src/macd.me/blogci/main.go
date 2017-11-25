@@ -37,7 +37,7 @@ const (
 
 func main() {
 
-	logfile, err := os.OpenFile("/opt/blogci/bin/blogci.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logfile, err := os.OpenFile("/opt/bin/blogci.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("%s\n", err.Error())
 	}
