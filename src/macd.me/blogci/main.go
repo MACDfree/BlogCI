@@ -45,12 +45,12 @@ func main() {
 	logger = log.New(logfile, "", log.Ldate|log.Ltime|log.Llongfile)
 
 	// 修改config内容
-	bytes, err := ioutil.ReadFile(BlogPath + "config.yaml")
+	cfgbytes, err := ioutil.ReadFile(BlogPath + "config.yaml")
 	if err != nil {
 		log.Fatal("Open config file error:", err)
 	}
 	// 暂时做简单地替换
-	config := string(bytes)
+	config := string(cfgbytes)
 	config = strings.Replace(config, "||baseurl||", baseURL, -1)
 	config = strings.Replace(config, "||title||", title, -1)
 	config = strings.Replace(config, "||theme||", theme, -1)
@@ -78,11 +78,11 @@ func main() {
 	logger.Println(string(b))
 
 	// 下载静态页面
-	os.Chdir(BlogPath + "publish")
+	os.Chdir(BlogPath + "public")
 	cmd = exec.Command("git", "clone", publishGit, "./")
 	b, err = cmd.Output()
 	if err != nil {
-		logger.Println("clone md error: ", err)
+		logger.Println("clone static pages error: ", err)
 		return
 	}
 	logger.Println(string(b))
@@ -107,15 +107,20 @@ func main() {
 
 	// 修改publish仓库的gitconfig增加git认证
 	// 进入publish目录
-	os.Chdir(BlogPath + "publish")
+	os.Chdir(BlogPath + "public")
 	// 执行git配置凭据命令
-	cmd = exec.Command("git", "config", "credential.helper", "store", "--file", CredentialPath)
-	b, err = cmd.Output()
+	// 形如：git config credential.helper "store --file ~/.my-cre"
+	cmd = exec.Command("git", "config", "credential.helper", "\"store --file "+CredentialPath+"\"")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err = cmd.Run()
 	if err != nil {
-		logger.Println("config error: ", err)
+		logger.Println("config error: ", string(stderr.Bytes()))
 		return
 	}
-	logger.Println(string(b))
+	logger.Println(string(stdout.Bytes()))
 	// 填充用户名密码
 	cmd = exec.Command("/bin/sh", "-c", "echo -e 'protocol=https\nhost="+host+"\nusername="+userName+"\npassword="+password+"\n\n' | git credential-store --file "+CredentialPath+" store")
 	b, err = cmd.Output()
