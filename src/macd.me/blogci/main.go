@@ -58,38 +58,60 @@ func main() {
 
 	// 下载主题
 	// 切换至主题文件夹
-	os.Chdir(BlogPath + "themes")
-	cmd := exec.Command("git", "clone", themeGit)
-	b, err := cmd.Output()
+	themesPath := BlogPath + "themes"
+	itemList, err := ioutil.ReadDir(themesPath)
 	if err != nil {
-		logger.Println("clone theme error: ", err)
-		return
+		log.Fatal("Read themes dir err:", err)
 	}
-	logger.Println(string(b))
+	if len(itemList) <= 0 {
+		os.Chdir(themesPath)
+		cmd := exec.Command("git", "clone", themeGit)
+		b, err := cmd.Output()
+		if err != nil {
+			logger.Println("clone theme error: ", err)
+			return
+		}
+		logger.Println(string(b))
+	}
 
 	// 下载md文件
-	os.Chdir(BlogPath + "content")
-	cmd = exec.Command("git", "clone", blogGit, "./")
-	b, err = cmd.Output()
+	contentPath := BlogPath + "content"
+	itemList, err = ioutil.ReadDir(contentPath)
 	if err != nil {
-		logger.Println("clone md error: ", err)
-		return
+		log.Fatal("Read content dir err:", err)
 	}
-	logger.Println(string(b))
+	if len(itemList) <= 0 {
+		os.Chdir(contentPath)
+		cmd := exec.Command("git", "clone", blogGit, "./")
+		b, err := cmd.Output()
+		if err != nil {
+			logger.Println("clone md error: ", err)
+			return
+		}
+		logger.Println(string(b))
+	}
 
 	// 下载静态页面
-	os.Chdir(BlogPath + "public")
-	cmd = exec.Command("git", "clone", publishGit, "./")
-	b, err = cmd.Output()
+	publicPath := BlogPath + "public"
+	itemList, err = ioutil.ReadDir(publicPath)
 	if err != nil {
-		logger.Println("clone static pages error: ", err)
-		return
+		log.Fatal("Read public dir err:", err)
 	}
-	logger.Println(string(b))
+	if len(itemList) <= 0 {
+		os.Chdir(publicPath)
+		cmd := exec.Command("git", "clone", publishGit, "./")
+		b, err := cmd.Output()
+		if err != nil {
+			logger.Println("clone static pages error: ", err)
+			return
+		}
+		logger.Println(string(b))
+	}
 
 	// 设置username
-	cmd = exec.Command("git", "config", "user.name", userName)
-	b, err = cmd.Output()
+	os.Chdir(publicPath)
+	cmd := exec.Command("git", "config", "user.name", userName)
+	b, err := cmd.Output()
 	if err != nil {
 		logger.Println("git config username error: ", err)
 		return
@@ -97,6 +119,7 @@ func main() {
 	logger.Println(string(b))
 
 	// 设置email
+	os.Chdir(publicPath)
 	cmd = exec.Command("git", "config", "user.email", email)
 	b, err = cmd.Output()
 	if err != nil {
@@ -107,7 +130,7 @@ func main() {
 
 	// 修改publish仓库的gitconfig增加git认证
 	// 进入publish目录
-	os.Chdir(BlogPath + "public")
+	os.Chdir(publicPath)
 	// 执行git配置凭据命令
 	// 形如：git config credential.helper "store --file ~/.my-cre"
 	cmd = exec.Command("git", "config", "credential.helper", "\"store --file "+CredentialPath+"\"")
